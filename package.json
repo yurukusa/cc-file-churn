@@ -1,0 +1,27 @@
+{
+  "name": "cc-file-churn",
+  "version": "1.0.0",
+  "description": "Which files does Claude Code touch the most? Ranks files by Edit/Write/Read frequency across all sessions.",
+  "main": "cli.mjs",
+  "bin": {
+    "cc-file-churn": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "file-churn",
+    "developer-tools",
+    "cli",
+    "productivity"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  }
+}
