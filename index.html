@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cc-file-churn — Which files does Claude Code touch the most?</title>
+<meta name="description" content="Find the hotspot files in your Claude Code sessions. Drag in your ~/.claude folder to rank files by Edit/Write/Read frequency.">
+<meta property="og:title" content="cc-file-churn — File activity ranking for Claude Code">
+<meta property="og:description" content="Which files does your AI keep coming back to? Ranks by writes, reads, and searches across all sessions.">
+<meta property="og:url" content="https://yurukusa.github.io/cc-file-churn/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@yurukusa_dev">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0d1117; --surface: #161b22; --border: #30363d;
+  --text: #e6edf3; --muted: #8b949e;
+  --green: #56d364; --yellow: #f7c948; --orange: #ffa657;
+  --cyan: #58d8f0; --blue: #58a6ff; --red: #ff7b72;
+}
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Consolas, monospace;
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; padding: 2rem 1rem;
+}
+.header { text-align: center; margin-bottom: 2rem; }
+.header h1 { font-size: 1.8rem; font-weight: 700; color: var(--orange); margin-bottom: 0.5rem; }
+.header p { color: var(--muted); font-size: 0.9rem; }
+.drop-zone {
+  width: 100%; max-width: 600px; border: 2px dashed var(--border);
+  border-radius: 12px; padding: 3rem 2rem; text-align: center;
+  cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 2rem; background: var(--surface);
+}
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--orange); background: #1a1a0f; }
+.drop-zone h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }
+.drop-zone p { color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+.drop-zone .icon { font-size: 2.5rem; margin-bottom: 1rem; }
+.drop-zone input[type="file"] { display: none; }
+.controls {
+  width: 100%; max-width: 700px; display: flex; gap: 0.5rem;
+  flex-wrap: wrap; margin-bottom: 1.5rem;
+}
+.filter-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.4rem 0.85rem; font-size: 0.8rem;
+  color: var(--muted); cursor: pointer; font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+}
+.filter-btn.active { border-color: var(--orange); color: var(--orange); }
+.filter-btn:hover { border-color: var(--text); color: var(--text); }
+#results { width: 100%; max-width: 700px; display: none; }
+.meta { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.5rem; text-align: center; }
+.file-row {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 0.75rem;
+}
+.file-rank { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.rank-num { font-size: 1.1rem; min-width: 1.5rem; }
+.file-path { font-size: 0.82rem; color: var(--cyan); font-family: Consolas, monospace; word-break: break-all; }
+.bar-container { margin-bottom: 0.5rem; }
+.bar-bg { height: 6px; border-radius: 3px; background: #21262d; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; background: var(--orange); }
+.bar-label { display: flex; justify-content: space-between; font-size: 0.75rem; margin-top: 0.25rem; }
+.counts { display: flex; gap: 1rem; font-size: 0.78rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.count-w { color: var(--orange); } .count-r { color: var(--green); } .count-s { color: var(--muted); }
+.summary-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1.25rem; text-align: center; margin-top: 1.5rem;
+}
+.s-title { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+.s-stats { display: flex; justify-content: center; gap: 2.5rem; flex-wrap: wrap; }
+.s-stat .num { font-size: 1.5rem; font-weight: 700; color: var(--orange); display: block; }
+.s-stat .lbl { font-size: 0.75rem; color: var(--muted); }
+.footer { margin-top: 2rem; text-align: center; font-size: 0.8rem; color: var(--muted); }
+.footer a { color: var(--blue); text-decoration: none; margin: 0 0.5rem; }
+.btn {
+  background: var(--orange); color: #0d1117; border: none;
+  border-radius: 6px; padding: 0.6rem 1.5rem; font-size: 0.9rem;
+  font-weight: 600; cursor: pointer; margin-top: 1rem; font-family: inherit;
+}
+.btn:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>cc-file-churn</h1>
+  <p>Which files does Claude Code touch the most?</p>
+</div>
+<div class="drop-zone" id="dropZone" onclick="document.getElementById('fi').click()">
+  <div class="icon">📁</div>
+  <h2>Drop your .claude folder here</h2>
+  <p>Or click to select it.<br>Your data stays local — nothing is uploaded.</p>
+  <input type="file" id="fi" webkitdirectory multiple>
+  <button class="btn" onclick="event.stopPropagation(); document.getElementById('fi').click()">
+    Select ~/.claude folder
+  </button>
+</div>
+<div class="controls" id="controls" style="display:none;">
+  <button class="filter-btn active" data-mode="total">All activity</button>
+  <button class="filter-btn" data-mode="writes">Most-modified</button>
+  <button class="filter-btn" data-mode="reads">Most-referenced</button>
+</div>
+<div id="results">
+  <div class="meta" id="metaLine"></div>
+  <div id="fileList"></div>
+  <div class="summary-card" id="summaryCard"></div>
+  <div class="footer">
+    <a href="https://github.com/yurukusa/cc-file-churn" target="_blank">GitHub</a> ·
+    <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit (44 free tools)</a> ·
+    <span>Also: <code>npx cc-file-churn</code></span>
+  </div>
+</div>
+<div class="footer" id="footerMain">
+  <a href="https://github.com/yurukusa/cc-file-churn" target="_blank">GitHub</a> ·
+  <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a> ·
+  <span>Part of 44 free tools for Claude Code</span>
+</div>
+<script>
+const READ_TOOLS = new Set(['Read']);
+const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit']);
+const SEARCH_TOOLS = new Set(['Grep', 'Glob']);
+const ALL_TRACKED = new Set([...READ_TOOLS, ...WRITE_TOOLS, ...SEARCH_TOOLS]);
+
+let allFiles = [];
+let currentMode = 'total';
+
+const dropZone = document.getElementById('dropZone');
+const fi = document.getElementById('fi');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); processFiles(Array.from(e.dataTransfer.files)); });
+fi.addEventListener('change', e => processFiles(Array.from(e.target.files)));
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    renderFiles(allFiles);
+  });
+});
+
+async function processFiles(files) {
+  const jsonlFiles = files.filter(f => f.name.endsWith('.jsonl') && f.webkitRelativePath.includes('projects'));
+  if (!jsonlFiles.length) { alert('No session files found.\nSelect your .claude folder (not a subfolder).'); return; }
+  const fileMap = new Map();
+  for (const f of jsonlFiles) {
+    try {
+      const text = await readChunk(f, 4 * 1024 * 1024);
+      parseChunk(text, fileMap);
+    } catch {}
+  }
+  allFiles = [...fileMap.entries()].map(([path, c]) => ({
+    path, r: c.r, w: c.w, s: c.s, total: c.r + c.w + c.s
+  }));
+  const totalOps = allFiles.reduce((sum, e) => sum + e.total, 0);
+  document.getElementById('metaLine').textContent =
+    `${jsonlFiles.length} session files · ${allFiles.length} unique files · ${totalOps} tool calls`;
+  dropZone.style.display = 'none';
+  document.getElementById('footerMain').style.display = 'none';
+  document.getElementById('controls').style.display = 'flex';
+  document.getElementById('results').style.display = 'block';
+  renderFiles(allFiles);
+}
+
+async function readChunk(file, maxBytes) {
+  const start = Math.max(0, file.size - maxBytes);
+  return await file.slice(start).text();
+}
+
+function parseChunk(text, fileMap) {
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    let d; try { d = JSON.parse(line); } catch { continue; }
+    if (d.type !== 'assistant') continue;
+    for (const c of d?.message?.content ?? []) {
+      if (c?.type !== 'tool_use' || !ALL_TRACKED.has(c.name)) continue;
+      const path = c.input?.file_path ?? c.input?.path ?? '';
+      if (!path || typeof path !== 'string') continue;
+      const norm = path.replace(/^\/home\/[^/]+/, '~');
+      if (!fileMap.has(norm)) fileMap.set(norm, { r: 0, w: 0, s: 0 });
+      const e = fileMap.get(norm);
+      if (READ_TOOLS.has(c.name)) e.r++;
+      else if (WRITE_TOOLS.has(c.name)) e.w++;
+      else if (SEARCH_TOOLS.has(c.name)) e.s++;
+    }
+  }
+}
+
+function renderFiles(files) {
+  const sorted = [...files].sort((a, b) =>
+    currentMode === 'writes' ? b.w - a.w :
+    currentMode === 'reads' ? b.r - a.r : b.total - a.total
+  ).slice(0, 25);
+
+  const maxVal = sorted[0]?.[currentMode === 'writes' ? 'w' : currentMode === 'reads' ? 'r' : 'total'] ?? 1;
+  const medals = ['🥇', '🥈', '🥉'];
+  const list = document.getElementById('fileList');
+  list.innerHTML = sorted.map((e, i) => {
+    const val = currentMode === 'writes' ? e.w : currentMode === 'reads' ? e.r : e.total;
+    const pct = (val / maxVal * 100).toFixed(0);
+    const short = e.path.length > 65 ? '…' + e.path.slice(-64) : e.path;
+    const countParts = [];
+    if (e.w > 0) countParts.push(`<span class="count-w">${e.w} writes</span>`);
+    if (e.r > 0) countParts.push(`<span class="count-r">${e.r} reads</span>`);
+    if (e.s > 0) countParts.push(`<span class="count-s">${e.s} searches</span>`);
+    return `<div class="file-row">
+      <div class="file-rank">
+        <span class="rank-num">${medals[i] ?? '#' + (i+1)}</span>
+        <span style="font-size:1.1rem;font-weight:700;color:var(--orange)">${val}</span>
+      </div>
+      <div class="file-path">${short}</div>
+      <div class="bar-container">
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bar-label"><span>${currentMode}</span><span style="color:var(--muted)">${pct}%</span></div>
+      </div>
+      <div class="counts">${countParts.join('')}</div>
+    </div>`;
+  }).join('');
+
+  const totalWrites = files.reduce((s, e) => s + e.w, 0);
+  const totalReads = files.reduce((s, e) => s + e.r, 0);
+  const topFile = sorted[0];
+  document.getElementById('summaryCard').innerHTML = `
+    <div class="s-title">Summary</div>
+    <div class="s-stats">
+      <div class="s-stat"><span class="num">${files.length}</span><span class="lbl">unique files</span></div>
+      <div class="s-stat"><span class="num" style="color:var(--orange)">${totalWrites}</span><span class="lbl">total writes</span></div>
+      <div class="s-stat"><span class="num" style="color:var(--green)">${totalReads}</span><span class="lbl">total reads</span></div>
+      <div class="s-stat"><span class="num">${topFile ? topFile.total : 0}</span><span class="lbl">max activity (#1)</span></div>
+    </div>`;
+}
+</script>
+</body>
+</html>
