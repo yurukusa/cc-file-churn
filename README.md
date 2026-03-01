@@ -53,7 +53,7 @@ npx cc-file-churn --json       # JSON output for scripting
 
 ## Part of cc-toolkit
 
-One of 44 free tools for Claude Code users → [cc-toolkit](https://yurukusa.github.io/cc-toolkit/)
+One of 49 free tools for Claude Code users → [cc-toolkit](https://yurukusa.github.io/cc-toolkit/)
 
 ## License
 
