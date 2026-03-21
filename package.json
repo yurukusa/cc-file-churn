@@ -23,5 +23,6 @@
   "type": "module",
   "engines": {
     "node": ">=18"
-  }
+  },
+  "homepage": "https://github.com/yurukusa/cc-file-churn#readme"
 }
