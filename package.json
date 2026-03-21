@@ -1,6 +1,6 @@
 {
   "name": "cc-file-churn",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Which files does Claude Code touch the most? Ranks files by Edit/Write/Read frequency across all sessions.",
   "main": "cli.mjs",
   "bin": {

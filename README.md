@@ -58,3 +58,7 @@ One of 50 free tools for Claude Code users → [cc-toolkit](https://yurukusa.git
 ## License
 
 MIT
+
+### Want to optimize how Claude Code uses its tools?
+
+**[Claude Code Ops Kit](https://yurukusa.github.io/cc-ops-kit-landing/?utm_source=github&utm_medium=readme&utm_campaign=cc-file-churn)** ($19) — 10 production hooks + 6 templates + 3 tools. Built from 160+ hours of autonomous operation.
